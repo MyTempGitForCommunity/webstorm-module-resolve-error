@@ -1,5 +1,5 @@
 import {describe, expect} from '@jest/globals'
-import {PathResolver, Route, Routes} from '@dwfe/path-resolver'
+import {PathResolver, PathResolveResult, Route, Routes} from '@dwfe/path-resolver'
 
 const routes: Routes = [
   {
@@ -8,37 +8,25 @@ const routes: Routes = [
       {
         path: 'books', component: '/books', children: [
           {path: ':year/:genre', component: '/books/:year/:genre'},
-          {
-            path: '(.*)', component: '/books/(.*)',
-            redirectTo: '/auto', name: '/auto'
-          }
+          {path: '(.*)', component: '/books/(.*)', redirectTo: '/auto'}
         ]
       }
     ]
   },
   {
     path: 'team/:id', component: '/team/:id', children: [
-      {
-        path: '', component: '/team/:id', children: [
-          {path: 'user/:name', component: '/team/:id/user/:name', name: 'world'}
-        ]
-      },
+      {path: 'group/:gr_id', component: '/team/:id/group/:gr_id'},
       {path: 'users', component: '/team/:id/users'},
-      {path: 'user/:name', component: '/team/:id/user/:name', name: 'hello'},
-      {
-        path: 'hr', component: '/team/:id/hr',
-        redirectTo: 'user/:name', name: '/team/:id/user/:name'
-      }
+      {path: 'user/:name', component: '/team/:id/user/:name'},
+      {path: 'hr', component: '/team/:id/hr', redirectTo: ''},
+      {path: '(.*)', component: '/team/:id/(.*)', redirectTo: 'users'}
     ]
   },
   {
-    path: 'auto', component: '/auto', children: [
-      {path: '', component: '/auto'},
+    path: 'auto', component: '/auto', name: '/auto 1', children: [
+      {path: '', component: '/auto', name: '/auto 2',},
       {path: ':color', component: '/auto/:color'},
-      {
-        path: 'check-redirect', component: '/auto/check-redirect',
-        redirectTo: '', name: '/auto'
-      }
+      {path: 'check/redirect', component: '/auto/check/redirect', redirectTo: 'aqua'}
     ]
   }
 ]
@@ -46,7 +34,7 @@ const routes: Routes = [
 describe(`tests`, () => {
   const pathResolver = new PathResolver(routes)
 
-  describe(`init`, () => {
+  const initTests = () => {
     test(`clone routes and change`, () => {
       traverse(routes, (route: Route) => {
         expect(route.path).not.toEqual(route.component)
@@ -57,35 +45,68 @@ describe(`tests`, () => {
         expect(route.path).toEqual(route.component)
       })
     })
-    test(`redirectTo`, () => {
-      traverse(pathResolver.routes, (route: Route) => {
-        const redirectTo = route.redirectTo
-        if (typeof redirectTo === 'string') {
-          if (redirectTo === '')
-            expect(redirectTo).not.toEqual(route.name)
-          else if (redirectTo[0] === '/')
-            expect(redirectTo).toEqual(route.name)
-          else
-            expect(route.redirectTo).not.toEqual(route.name)
-        }
-      })
-    })
-  })
+  }
+
+  describe(`init`, initTests)
 
   test(`resolve`, () => {
-    const pathname = '/auto'
-    // const pathname = '/not-exist'
-    // const pathname = '/books/2020/comics'
-    // const pathname = '/books/hello/world/123'
-    // const pathname = '/books/all-routes'
-    // const pathname = '/team/1/user/alex'
-    // const pathname = '/team/1/hr'
-    const res = pathResolver.resolve(pathname)
-    console.log(`res`, JSON.stringify(res, null, 2))
+    let pathname, res, params;
+
+    pathname = '/some/not-exist'
+    res = pathResolver.resolve(pathname)
+    expect(res).toBeFalsy()
+
+    pathname = '/books/2020/comics' // '/books/:year/:genre'
+    res = pathResolver.resolve(pathname)
+    expect(res).toBeTruthy()
+    expect((res as PathResolveResult).route.redirectTo).toBeFalsy()
+    params = (res as PathResolveResult).params
+    expect(params).toBeTruthy()
+    expect(Object.keys(params).length).toEqual(2)
+    expect(params.year).toEqual('2020')
+    expect(params.genre).toEqual('comics')
+
+    pathname = '/books/hello/world/123' // '/books/(.*)'
+    res = pathResolver.resolve(pathname)
+    expect(res).toBeTruthy()
+    expect((res as PathResolveResult).route.redirectTo).toEqual('/auto')
+
+    pathname = '/team/0/group/12' // '/team/:id/group/:gr_id'
+    res = pathResolver.resolve(pathname)
+    expect(res).toBeTruthy()
+    params = (res as PathResolveResult).params
+    expect(params).toBeTruthy()
+    expect(Object.keys(params).length).toEqual(2)
+    expect(params.id).toEqual('0')
+    expect(params.gr_id).toEqual('12')
+
+    pathname = '/team/1/hr' // '/team/:id/hr'
+    res = pathResolver.resolve(pathname)
+    expect(res).toBeTruthy()
+    expect((res as PathResolveResult).route.redirectTo).toEqual('/team/1')
+
+    pathname = '/team/7/whatwg' // '/team/:id/(.*)'
+    res = pathResolver.resolve(pathname)
+    expect(res).toBeTruthy()
+    expect((res as PathResolveResult).route.redirectTo).toEqual('/team/7/users')
+
+    pathname = '/auto' // '/auto'
+    res = pathResolver.resolve(pathname)
+    expect(res).toBeTruthy()
+    expect((res as PathResolveResult).route.name).not.toEqual('/auto 2')
+    expect((res as PathResolveResult).route.name).toEqual('/auto 1')
+
+    pathname = '/auto/check/redirect' // '/auto/check/redirect'
+    res = pathResolver.resolve(pathname)
+    expect(res).toBeTruthy()
+    expect((res as PathResolveResult).route.redirectTo).toEqual('/auto/aqua')
   })
+
+  describe(`init re-test`, initTests)
+
 })
 
-const traverse = (routes: Routes, fn) => {
+const traverse = (routes: Routes | undefined, fn) => {
   if (!routes)
     return;
 

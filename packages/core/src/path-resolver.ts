@@ -1,4 +1,4 @@
-import {match} from 'path-to-regexp'
+import {compile, match} from 'path-to-regexp'
 import {PathResolveResult, Route, Routes} from './contract'
 
 export class PathResolver {
@@ -29,13 +29,16 @@ export class PathResolver {
       return;
 
     for (let i = 0; i < routes.length; i++) {
-      const route = routes[i]
-      const matchResult = match(route.path)(pathname)
-      if (matchResult) {
-        return {
-          route,
-          params: matchResult.params
+      const route = {...routes[i]}
+      const matching = match(route.path)(pathname)
+      let params;
+      if (matching) {
+        params = matching.params
+        if (route.redirectTo) {
+          route.redirectTo = compile(route.redirectTo)(params)
         }
+        route.path = pathname
+        return {route, params}
       }
       const found = this.find(pathname, route.children)
       if (found)
@@ -62,9 +65,8 @@ const init = {
 
     const children: Routes = []
     for (let i = 0; i < routes.length; i++) {
-      children.push({...routes[i]})
-      const route = children[i]
-      route.redirectTo = this.redirectTo(route.redirectTo, parentPath)
+      const route = {...routes[i]}
+      children.push(route)
 
       const {path} = route
       if (path === '') {
@@ -73,6 +75,7 @@ const init = {
         const prefix = parentPath === '/' ? '' : parentPath
         route.path = prefix + '/' + path
       }
+      route.redirectTo = this.redirectTo(route.redirectTo, parentPath)
       route.children = this.children(route)
     }
     return children
