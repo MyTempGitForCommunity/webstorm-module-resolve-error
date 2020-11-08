@@ -1,31 +1,55 @@
-import {Path} from 'path-to-regexp'
-import {Routes} from './contract'
+import {Route, Routes} from './contract'
 
 export class PathResolver {
+  routes: Routes = [];
 
-  constructor(private routes: Routes) {
+  constructor(routes: Routes) {
+    routes.forEach(r => {
+      const route = {...r}
+
+      // Step 1. All root paths get a prefix '/'
+      route.path = '/' + route.path
+
+      // Step 2. All children paths are obtained as follows:
+      //         [full parent path] + '/' + [child path]
+      route.children = initChildren(route)
+
+      this.routes.push(route)
+    })
   }
 
-  get test(): string {
-    return 'hello world'
-  }
 
-  traverse(routes: Routes = this.routes, parentPath: Path = '') {
+  traverse(parent: Route, routes: Routes) {
 
     for (let i = 0; i < routes.length; i++) {
-      const {path, children, component} = routes[i]
-      const target = `${parentPath}${path}`
+      const route = routes[i]
+      const {children} = route
+
       //
       // check: is match?
       //
       if (children) {
-        this.traverse(children, target)
+        this.traverse(route, children)
       }
     }
-
-    // (routes || this.routes).map(({path, component, children}) => {
-    //   if (children) this.traverse(children)
-    //
-    // })
   }
+}
+
+const initChildren = ({path: parentPath, children: routes}: Route): Routes | undefined => {
+  if (!routes)
+    return;
+
+  const children: Routes = []
+  for (let i = 0; i < routes.length; i++) {
+    children.push({...routes[i]})
+    const route = children[i]
+    if (route.path === '') {
+      route.path = parentPath
+    } else {
+      const prefix = parentPath === '/' ? '' : parentPath
+      route.path = prefix + '/' + route.path
+    }
+    route.children = initChildren(route)
+  }
+  return children
 }
