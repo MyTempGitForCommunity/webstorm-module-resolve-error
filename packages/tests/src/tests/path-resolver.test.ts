@@ -7,11 +7,11 @@ const routes: Routes = [
       {path: '', component: '/'},
       {
         path: 'books', component: '/books', children: [
+          {path: ':year/:genre', component: '/books/:year/:genre'},
           {
-            path: ':year/:genre', component: '/books/:year/:genre',
+            path: '(.*)', component: '/books/(.*)',
             redirectTo: '/auto', name: '/auto'
-          },
-          {path: '(.*)', component: '/books/(.*)'}
+          }
         ]
       }
     ]
@@ -20,11 +20,11 @@ const routes: Routes = [
     path: 'team/:id', component: '/team/:id', children: [
       {
         path: '', component: '/team/:id', children: [
-          {path: 'user/:name', component: '/team/:id/user/:name'}
+          {path: 'user/:name', component: '/team/:id/user/:name', name: 'world'}
         ]
       },
       {path: 'users', component: '/team/:id/users'},
-      {path: 'user/:name', component: '/team/:id/user/:name'},
+      {path: 'user/:name', component: '/team/:id/user/:name', name: 'hello'},
       {
         path: 'hr', component: '/team/:id/hr',
         redirectTo: 'user/:name', name: '/team/:id/user/:name'
@@ -44,9 +44,9 @@ const routes: Routes = [
 ]
 
 describe(`tests`, () => {
+  const pathResolver = new PathResolver(routes)
 
   describe(`init`, () => {
-    const pathResolver = new PathResolver(routes)
     test(`clone routes and change`, () => {
       traverse(routes, (route: Route) => {
         expect(route.path).not.toEqual(route.component)
@@ -72,6 +72,17 @@ describe(`tests`, () => {
     })
   })
 
+  test(`resolve`, () => {
+    const pathname = '/auto'
+    // const pathname = '/not-exist'
+    // const pathname = '/books/2020/comics'
+    // const pathname = '/books/hello/world/123'
+    // const pathname = '/books/all-routes'
+    // const pathname = '/team/1/user/alex'
+    // const pathname = '/team/1/hr'
+    const res = pathResolver.resolve(pathname)
+    console.log(`res`, JSON.stringify(res, null, 2))
+  })
 })
 
 const traverse = (routes: Routes, fn) => {

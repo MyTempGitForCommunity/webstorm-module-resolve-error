@@ -9,3 +9,10 @@ export interface Route<TComponent = any, TActionContext = any, TActionResult = a
 
   name?: string;
 }
+
+export interface PathResolveResult {
+  route: Route;
+  params: PathParams
+}
+
+export type PathParams = {} | { [key: string]: string; }
